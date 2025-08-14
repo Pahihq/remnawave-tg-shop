@@ -391,8 +391,11 @@ class SubscriptionService:
         payment_db_id: int,
         promo_code_id_from_payment: Optional[int] = None,
         provider: str = "yookassa",
+        subscription_id: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
-
+        """Create/update subscription for user
+            extend existent subscription if subscription_id provided, elsewise create new
+        """
         db_user = await user_dal.get_user_by_id(session, user_id)
         if not db_user:
             logging.error(
@@ -410,8 +413,8 @@ class SubscriptionService:
             )
             return None
 
-        current_active_sub = await subscription_dal.get_active_subscription_by_user_id(
-            session, user_id, panel_user_uuid
+        current_active_sub = await subscription_dal.get_subscription_by_user_id_and_subscription_uuid(
+            session, user_id, panel_user_uuid,
         )
         start_date = datetime.now(timezone.utc)
         if (
@@ -426,7 +429,8 @@ class SubscriptionService:
 
         if promo_code_id_from_payment:
             promo_model = await promo_code_dal.get_promo_code_by_id(
-                session, promo_code_id_from_payment
+                session,
+                promo_code_id_from_payment
             )
             if (
                 promo_model
@@ -546,10 +550,10 @@ class SubscriptionService:
             )
             start_date = datetime.now(timezone.utc)
             new_end_date_obj = start_date + timedelta(days=bonus_days)
-            
+
             # For promo code activations, use the configured user traffic limit
             traffic_limit = self.settings.user_traffic_limit_bytes if "promo code" in reason.lower() else self.settings.trial_traffic_limit_bytes
-            
+
             bonus_sub_payload = {
                 "user_id": user_id,
                 "panel_user_uuid": panel_uuid,
@@ -588,7 +592,7 @@ class SubscriptionService:
                 ),
                 include_uuid=False,
             )
-            
+
             panel_update_success = (
                 await self.panel_service.update_user_details_on_panel(
                     panel_uuid,

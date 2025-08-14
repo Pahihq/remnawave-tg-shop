@@ -35,7 +35,9 @@ class PromoCodeService:
         code_input_upper = code_input.strip().upper()
 
         promo_data = await promo_code_dal.get_active_promo_code_by_code_str(
-            session, code_input_upper)
+            session,
+            code_input_upper
+        )
 
         if not promo_data:
             return False, _("promo_code_not_found", code=code_input_upper)
