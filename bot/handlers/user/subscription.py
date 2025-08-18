@@ -9,8 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config.settings import Settings
 from db.dal import payment_dal, subscription_dal
 from bot.keyboards.inline.user_keyboards import (
-    get_subscription_options_keyboard, get_payment_method_keyboard,
-    get_payment_url_keyboard, get_back_to_main_menu_markup)
+    get_subscription_options_keyboard,
+    get_payment_method_keyboard,
+    get_payment_url_keyboard,
+    get_back_to_main_menu_markup,
+    get_user_subscriptions_keyboard,
+)
 from bot.services.yookassa_service import YooKassaService
 from bot.services.stars_service import StarsService
 from bot.services.crypto_pay_service import CryptoPayService
@@ -411,6 +415,7 @@ async def my_subscription_command_handler(
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: JsonI18n = i18n_data.get("i18n_instance")
     get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
+    current_page =
 
     if not i18n or not target:
         if isinstance(event, types.Message):
@@ -420,8 +425,55 @@ async def my_subscription_command_handler(
     if not panel_service or not subscription_service:
         await target.answer(get_text("error_service_unavailable"))
         return
+    subscriptions_ids = await subscription_dal.get_subscriptions_by_user_id(session, event.from_user.id)
 
-    subscriptions = await subscription_dal.get_subscriptions_by_user_id(session, event.from_user.id)
+    if not subscriptions_ids:
+        text = get_text("subscription_not_active")
+        buy_button = InlineKeyboardButton(
+            text=get_text("menu_subscribe_inline", default="Купить"),
+            callback_data="main_action:subscribe",
+        )
+        back_markup = get_back_to_main_menu_markup(current_lang, i18n)
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [buy_button],
+                *back_markup.inline_keyboard,
+            ],
+        )
+        if isinstance(event, types.CallbackQuery):
+            await event.message.edit_text(text, reply_markup=kb)
+
+    text = get_text("active_subscriptions")
+
+    markup = get_user_subscriptions_keyboard(subscriptions_ids, len(subscriptions_ids),  current_lang, i18n)
+    if isinstance(event, types.CallbackQuery):
+        await event.answer()
+        try:
+            await event.message.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
+        except:
+            await bot.send_message(
+                chat_id=target.chat.id, text=text, reply_markup=markup, parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+    else:
+        await target.answer(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
+
+
+@router.callback_query(F.data.startswith("show_subscription:"))
+async def show_current_subscription_handler(
+    event: Union[types.Message, types.CallbackQuery],
+    i18n_data: dict,
+    settings: Settings,
+    panel_service: PanelApiService,
+    subscription_service: SubscriptionService,
+    session: AsyncSession,
+    bot: Bot,
+):
+    target = event.message if isinstance(event, types.CallbackQuery) else event
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
 
     active = await subscription_service.get_active_subscription_details(session, event.from_user.id)
 

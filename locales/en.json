@@ -4,7 +4,7 @@
 
   "menu_activate_trial_button": "🆓 Free Trial",
   "menu_subscribe_inline": "🚀 Purchase",
-  "menu_my_subscription_inline": "🔐 My Subscription",
+  "menu_my_subscription_inline": "🔐 My Subscriptions",
   "menu_referral_inline": "🎁 Referrals",
   "menu_apply_promo_button": "🎟 Promo Code",
   "menu_language_settings_inline": "🌐 Language",
@@ -54,6 +54,7 @@
   "traffic_unlimited": "Unlimited",
   "traffic_na": "n/a",
   "error_service_unavailable": "Service temporarily unavailable. Please try again later.",
+  "active_subscriptions": "Your active subscriptions",
 
   "promo_code_prompt": "Please enter your promo code:",
   "promo_code_not_found": "Promo code <code>{code}</code> not found, expired, or already used the maximum number of times.",

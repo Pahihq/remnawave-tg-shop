@@ -98,6 +98,22 @@ def get_trial_confirmation_keyboard(lang: str,
     return builder.as_markup()
 
 
+def get_user_subscriptions_keyboard(
+    subscriptions_ids: List[int],
+    total_subscriptions: int,
+    current_page: int,
+    lang: str,
+    i18n_instance
+) -> InlineKeyboardMarkup:
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+    builder = InlineKeyboardBuilder()
+    for subscriptions_id in subscriptions_ids:
+        builder.button(text=str(subscriptions_id),callback_data=f"show_subscription:{subscriptions_id}")
+
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def get_subscription_options_keyboard(subscription_options: Dict[
     int, Optional[int]], currency_symbol_val: str, lang: str,
                                       i18n_instance) -> InlineKeyboardMarkup:

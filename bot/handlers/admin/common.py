@@ -54,7 +54,8 @@ async def admin_panel_actions_callback_handler(
         callback: types.CallbackQuery, state: FSMContext, settings: Settings,
         i18n_data: dict, bot: Bot, panel_service: PanelApiService,
         subscription_service: SubscriptionService, session: AsyncSession):
-    action_parts = callback.data.split(":")
+    action_par
+    ts = callback.data.split(":")
     action = action_parts[1]
 
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
@@ -73,77 +74,79 @@ async def admin_panel_actions_callback_handler(
                               show_alert=True)
         return
 
-    if action == "stats":
-        await admin_stats_handlers.show_statistics_handler(
-            callback, i18n_data, settings, session)
-    elif action == "broadcast":
-        await admin_broadcast_handlers.broadcast_message_prompt_handler(
-            callback, state, i18n_data, settings, session)
-    elif action == "create_promo":
-        await admin_promo_create_handlers.create_promo_prompt_handler(
-            callback, state, i18n_data, settings, session)
-    elif action == "create_bulk_promo":
-        await admin_promo_bulk_handlers.create_bulk_promo_prompt_handler(
-            callback, state, i18n_data, settings, session)
-    elif action == "manage_promos":
-        await admin_promo_manage_handlers.manage_promo_codes_handler(
-            callback, i18n_data, settings, session)
-    elif action == "view_promos":
-        await admin_promo_manage_handlers.view_promo_codes_handler(
-            callback, i18n_data, settings, session)
-    elif action == "ban_user_prompt":
-        await admin_user_mgmnt_handlers.ban_user_prompt_handler(
-            callback, state, i18n_data, settings, session)
-    elif action == "unban_user_prompt":
-        await admin_user_mgmnt_handlers.unban_user_prompt_handler(
-            callback, state, i18n_data, settings, session)
-    elif action == "users_management":
-        from . import user_management as admin_user_management_handlers
-        await admin_user_management_handlers.user_management_menu_handler(
-            callback, state, i18n_data, settings, session)
-    elif action == "view_banned":
+    match action:
+        case "stats":
+            await admin_stats_handlers.show_statistics_handler(
+                callback, i18n_data, settings, session)
+        case "broadcast":
+            await admin_broadcast_handlers.broadcast_message_prompt_handler(
+                callback, state, i18n_data, settings, session)
+        case "create_promo":
 
-        await admin_user_mgmnt_handlers.view_banned_users_handler(
-            callback, state, i18n_data, settings, session)
-    elif action == "view_logs_menu":
-        await admin_logs_handlers.display_logs_menu(callback, i18n_data,
-                                                    settings, session)
-    elif action == "promo_management":
-        await admin_promo_manage_handlers.promo_management_handler(
-            callback, i18n_data, settings, session)
-    elif action == "sync_panel":
+            await admin_promo_create_handlers.create_promo_prompt_handler(
+                callback, state, i18n_data, settings, session)
+        case "create_bulk_promo":
+            await admin_promo_bulk_handlers.create_bulk_promo_prompt_handler(
+                callback, state, i18n_data, settings, session)
+        case "manage_promos":
+            await admin_promo_manage_handlers.manage_promo_codes_handler(
+                callback, i18n_data, settings, session)
+        case "view_promos":
+            await admin_promo_manage_handlers.view_promo_codes_handler(
+                callback, i18n_data, settings, session)
+        case "ban_user_prompt":
+            await admin_user_mgmnt_handlers.ban_user_prompt_handler(
+                callback, state, i18n_data, settings, session)
+        case "unban_user_prompt":
+            await admin_user_mgmnt_handlers.unban_user_prompt_handler(
+                callback, state, i18n_data, settings, session)
+        case "users_management":
+            from . import user_management as admin_user_management_handlers
+            await admin_user_management_handlers.user_management_menu_handler(
+                callback, state, i18n_data, settings, session)
+        case "view_banned":
 
-        await admin_sync_handlers.sync_command_handler(
-            message_event=callback,
-            bot=bot,
-            settings=settings,
-            i18n_data=i18n_data,
-            panel_service=panel_service,
-            session=session)
-        await callback.answer(_("admin_sync_initiated_from_panel"))
-    elif action == "queue_status":
-        await show_queue_status_handler(callback, i18n_data)
-    elif action == "view_payments":
-        from . import payments as admin_payments_handlers
-        await admin_payments_handlers.view_payments_handler(
-            callback, i18n_data, settings, session)
-    elif action == "main":
-        try:
-            await callback.message.edit_text(
-                _(key="admin_panel_title"),
-                reply_markup=get_admin_panel_keyboard(i18n, current_lang,
-                                                      settings))
-        except Exception:
-            await callback.message.answer(
-                _(key="admin_panel_title"),
-                reply_markup=get_admin_panel_keyboard(i18n, current_lang,
-                                                      settings))
-        await callback.answer()
-    else:
-        logging.warning(
-            f"Unknown admin_action received: {action} from callback {callback.data}"
-        )
-        await callback.answer(_("admin_unknown_action"), show_alert=True)
+            await admin_user_mgmnt_handlers.view_banned_users_handler(
+                callback, state, i18n_data, settings, session)
+        case "view_logs_menu":
+            await admin_logs_handlers.display_logs_menu(callback, i18n_data,
+                                                        settings, session)
+        case "promo_management":
+            await admin_promo_manage_handlers.promo_management_handler(
+                callback, i18n_data, settings, session)
+        case "sync_panel":
+
+            await admin_sync_handlers.sync_command_handler(
+                message_event=callback,
+                bot=bot,
+                settings=settings,
+                i18n_data=i18n_data,
+                panel_service=panel_service,
+                session=session)
+            await callback.answer(_("admin_sync_initiated_from_panel"))
+        case "queue_status":
+            await show_queue_status_handler(callback, i18n_data)
+        case "view_payments":
+            from . import payments as admin_payments_handlers
+            await admin_payments_handlers.view_payments_handler(
+                callback, i18n_data, settings, session)
+        case "main":
+            try:
+                await callback.message.edit_text(
+                    _(key="admin_panel_title"),
+                    reply_markup=get_admin_panel_keyboard(i18n, current_lang,
+                                                          settings))
+            except Exception:
+                await callback.message.answer(
+                    _(key="admin_panel_title"),
+                    reply_markup=get_admin_panel_keyboard(i18n, current_lang,
+                                                          settings))
+            await callback.answer()
+        case _:
+            logging.warning(
+                f"Unknown admin_action received: {action} from callback {callback.data}"
+            )
+            await callback.answer(_("admin_unknown_action"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("admin_section:"))
