@@ -4,6 +4,7 @@ import io
 from aiogram import Router, F, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramBadRequest
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +21,7 @@ from bot.services.referral_service import ReferralService
 from bot.services.panel_api_service import PanelApiService
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 from bot.middlewares.i18n import JsonI18n
+from bot.utils.safe_message import safe_edit_message
 from aiogram import Bot
 
 router = Router(name="admin_payments_router")
@@ -132,7 +134,8 @@ async def view_payments_handler(callback: types.CallbackQuery, i18n_data: dict,
     total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
 
     if not payments and page == 0:
-        await callback.message.edit_text(
+        await safe_edit_message(
+            callback.message,
             _("admin_no_payments_found", default="Платежи не найдены."),
             reply_markup=get_back_to_admin_panel_keyboard(current_lang, i18n),
             parse_mode="HTML"
@@ -172,7 +175,7 @@ async def view_payments_handler(callback: types.CallbackQuery, i18n_data: dict,
         ),
         InlineKeyboardButton(
             text=_("admin_refresh_payments", default="🔄 Обновить"), 
-            callback_data=f"payments_page:{page}"
+            callback_data="payments_refresh"
         )
     )
     
@@ -182,7 +185,8 @@ async def view_payments_handler(callback: types.CallbackQuery, i18n_data: dict,
         callback_data="admin_section:stats_monitoring"
     ))
 
-    await callback.message.edit_text(
+    await safe_edit_message(
+        callback.message,
         "\n".join(text_parts),
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
@@ -199,6 +203,22 @@ async def payments_pagination_handler(callback: types.CallbackQuery, i18n_data: 
         await view_payments_handler(callback, i18n_data, settings, session, page)
     except (ValueError, IndexError):
         await callback.answer("Error processing pagination.", show_alert=True)
+
+
+@router.callback_query(F.data == "payments_refresh")
+async def payments_refresh_handler(callback: types.CallbackQuery, i18n_data: dict, 
+                                 settings: Settings, session: AsyncSession):
+    """Handle payments refresh - reload current page data."""
+    # Extract current page from message text or use 0 as default
+    current_page = 0
+    if callback.message and callback.message.text:
+        # Try to extract page number from text like "стр. 2/5"
+        import re
+        page_match = re.search(r'стр\. (\d+)/(\d+)', callback.message.text)
+        if page_match:
+            current_page = int(page_match.group(1)) - 1  # Convert to 0-based index
+    
+    await view_payments_handler(callback, i18n_data, settings, session, current_page)
 
 
 @router.callback_query(F.data == "payments_export_csv")
@@ -376,7 +396,8 @@ async def approve_phone_transfer_handler(
         )
         
         # Update admin message
-        await callback.message.edit_text(
+        await safe_edit_message(
+            callback.message,
             f"✅ Платеж {payment_id} подтвержден!\n"
             f"Подписка активирована для пользователя {payment.user_id}.\n"
             f"Срок: {payment.subscription_duration_months} мес.\n"
@@ -412,7 +433,8 @@ async def reject_phone_transfer_handler(
     
     # Show rejection reason keyboard
     reply_markup = get_phone_transfer_rejection_reason_keyboard(payment_id)
-    await callback.message.edit_text(
+    await safe_edit_message(
+        callback.message,
         "Выберите причину отклонения платежа:",
         reply_markup=reply_markup
     )
@@ -475,7 +497,8 @@ async def reject_reason_handler(
         logging.warning(f"Payment {payment_id} not found when trying to notify user")
     
     # Update admin message
-    await callback.message.edit_text(
+    await safe_edit_message(
+        callback.message,
         f"❌ Платеж {payment_id} отклонен!\n"
         f"Причина: {reason_text}\n"
         f"Пользователь уведомлен об отклонении.",
@@ -541,7 +564,8 @@ async def view_phone_transfer_handler(
     
     # Show details with approval keyboard
     reply_markup = get_phone_transfer_approval_keyboard(payment_id)
-    await callback.message.edit_text(
+    await safe_edit_message(
+        callback.message,
         details_text,
         reply_markup=reply_markup,
         parse_mode="HTML"
@@ -577,7 +601,8 @@ async def cancel_rejection_handler(
     
     # Show approval keyboard again
     reply_markup = get_phone_transfer_approval_keyboard(payment_id)
-    await callback.message.edit_text(
+    await safe_edit_message(
+        callback.message,
         f"📱 <b>Платеж по переводу {payment_id}</b>\n\n"
         f"👤 User {payment.user_id}\n"
         f"💰 Сумма: {payment.amount} {payment.currency}\n"

@@ -1,1 +1,1 @@
-# Bot utilities package
+# Bot utilities module
