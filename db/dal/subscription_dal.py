@@ -29,6 +29,8 @@ async def get_subscriptions_by_user_id(
     session: AsyncSession,
     user_id: int,
     panel_user_uuid: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
 ) -> Sequence[Subscription]:
     """
     Select all subscriptions by user_id
@@ -38,11 +40,25 @@ async def get_subscriptions_by_user_id(
     )
     if panel_user_uuid:
         stmt = stmt.where(Subscription.panel_user_uuid == panel_user_uuid)
+    if limit:
+        stmt = stmt.limit(limit)
+    if offset:
+        stmt = stmt.offset(offset)
     stmt = stmt.order_by(Subscription.subscription_id)
 
     result = await session.execute(stmt)
 
     return result.scalars().all()
+
+async def get_all_subscriptions_by_user_id_count(
+    session: AsyncSession,
+    user_id: int,
+):
+    stmt = select(func.count()).select_from(Subscription).where(
+        Subscription.user_id==user_id
+    )
+    result = await session.scalar(stmt)
+    return result
 
 
 async def get_active_subscriptions_by_user_id(
@@ -65,7 +81,7 @@ async def get_active_subscriptions_by_user_id(
 async def get_subscription_by_user_id_and_subscription_uuid(
     session: AsyncSession,
     user_id: int,
-    subscription_id: str,
+    subscription_id: int,
 ) -> Optional[Subscription]:
     stmt = select(Subscription).where(
         Subscription.user_id == user_id,

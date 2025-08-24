@@ -66,15 +66,14 @@ async def referral_command_handler(event: Union[types.Message,
     bonus_info_parts = []
     if settings.subscription_options:
 
-        for months_period_key, _price in sorted(
-                settings.subscription_options.items()):
+        for item in sorted(settings.subscription_options):
 
-            inv_bonus = settings.referral_bonus_inviter.get(months_period_key)
-            ref_bonus = settings.referral_bonus_referee.get(months_period_key)
+            inv_bonus = settings.referral_bonus_inviter.get(item.duration)
+            ref_bonus = settings.referral_bonus_referee.get(item.duration)
             if inv_bonus is not None or ref_bonus is not None:
                 bonus_info_parts.append(
                     _("referral_bonus_per_period",
-                      months=months_period_key,
+                      months=item.duration,
                       inviter_bonus_days=inv_bonus
                       if inv_bonus is not None else _("no_bonus_placeholder"),
                       referee_bonus_days=ref_bonus

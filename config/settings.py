@@ -3,6 +3,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, ValidationError, computed_field, field_validator
 from typing import Optional, List, Dict, Any
 
+from bot.dto.subscription_dto import SubscriptionOptions
+
 
 class Settings(BaseSettings):
     BOT_TOKEN: str
@@ -229,31 +231,33 @@ class Settings(BaseSettings):
 
     @computed_field
     @property
-    def subscription_options(self) -> Dict[int, float]:
-        options: Dict[int, float] = {}
+    def subscription_options(self) -> List[SubscriptionOptions]:
+        options: List[SubscriptionOptions] = []
 
         if self.MONTH_1_ENABLED and self.RUB_PRICE_1_MONTH is not None:
-            options[1] = float(self.RUB_PRICE_1_MONTH)
+            options.append(SubscriptionOptions(1, self.RUB_PRICE_1_MONTH))
         if self.MONTH_3_ENABLED and self.RUB_PRICE_3_MONTHS is not None:
-            options[3] = float(self.RUB_PRICE_3_MONTHS)
+            options.append(SubscriptionOptions(3, self.RUB_PRICE_3_MONTHS))
         if self.MONTH_6_ENABLED and self.RUB_PRICE_6_MONTHS is not None:
-            options[6] = float(self.RUB_PRICE_6_MONTHS)
+            options.append(SubscriptionOptions(6, self.RUB_PRICE_6_MONTHS))
         if self.MONTH_12_ENABLED and self.RUB_PRICE_12_MONTHS is not None:
-            options[12] = float(self.RUB_PRICE_12_MONTHS)
+            options.append(SubscriptionOptions(12, self.RUB_PRICE_12_MONTHS))
         return options
 
     @computed_field
     @property
-    def stars_subscription_options(self) -> Dict[int, int]:
-        options: Dict[int, int] = {}
+    def stars_subscription_options(self) -> List[SubscriptionOptions]:
+        options: List[SubscriptionOptions] = []
         if self.STARS_ENABLED and self.MONTH_1_ENABLED and self.STARS_PRICE_1_MONTH is not None:
-            options[1] = self.STARS_PRICE_1_MONTH
+            options.append(SubscriptionOptions(1, self.STARS_PRICE_1_MONTH))
+            print(options)
+            logging.info(options)
         if self.STARS_ENABLED and self.MONTH_3_ENABLED and self.STARS_PRICE_3_MONTHS is not None:
-            options[3] = self.STARS_PRICE_3_MONTHS
+            options.append(SubscriptionOptions(3, self.STARS_PRICE_3_MONTHS))
         if self.STARS_ENABLED and self.MONTH_6_ENABLED and self.STARS_PRICE_6_MONTHS is not None:
-            options[6] = self.STARS_PRICE_6_MONTHS
+            options.append(SubscriptionOptions(6, self.STARS_PRICE_6_MONTHS))
         if self.STARS_ENABLED and self.MONTH_12_ENABLED and self.STARS_PRICE_12_MONTHS is not None:
-            options[12] = self.STARS_PRICE_12_MONTHS
+            options.append(SubscriptionOptions(12, self.STARS_PRICE_12_MONTHS))
         return options
 
     @computed_field

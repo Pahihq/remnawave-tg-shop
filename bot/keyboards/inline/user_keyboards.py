@@ -1,7 +1,11 @@
+import math
+
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 from aiogram.types import InlineKeyboardMarkup, WebAppInfo
 from typing import Dict, Optional, List
 
+from bot.dto.subscription_dto import SubscriptionOptions
+from bot.helpers.keyboard_helpers import get_pagination_buttons
 from config.settings import Settings
 
 
@@ -103,36 +107,87 @@ def get_user_subscriptions_keyboard(
     total_subscriptions: int,
     current_page: int,
     lang: str,
-    i18n_instance
+    i18n_instance,
+    page_size: int = 5,
 ) -> InlineKeyboardMarkup:
+    """
+    Get keyboard markup with subscriptions name in format user_id
+    """
     _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
     builder = InlineKeyboardBuilder()
     for subscriptions_id in subscriptions_ids:
         builder.button(text=str(subscriptions_id),callback_data=f"show_subscription:{subscriptions_id}")
 
+    pagination_buttons = get_pagination_buttons(
+        total_subscriptions,
+        page_size,
+        current_page,
+        "main_action:my_subscription:",
+        lang,
+        i18n_instance,
+    )
     builder.adjust(1)
+    if pagination_buttons:
+        builder.row(*pagination_buttons)
+
+    back_keyboard = get_back_to_main_menu_markup(lang, i18n_instance)
+    for row in back_keyboard.inline_keyboard:
+        builder.row(*row)
+
     return builder.as_markup()
 
 
-def get_subscription_options_keyboard(subscription_options: Dict[
-    int, Optional[int]], currency_symbol_val: str, lang: str,
-                                      i18n_instance) -> InlineKeyboardMarkup:
+def get_subscription_options_keyboard(
+    subscription_options: List[SubscriptionOptions],
+    currency_symbol_val: str,
+    subscription_id: Optional[id],
+    lang: str,
+    i18n_instance
+) -> InlineKeyboardMarkup:
     _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
     builder = InlineKeyboardBuilder()
     if subscription_options:
-        for months, price in subscription_options.items():
-            if price is not None:
-                button_text = _("subscribe_for_months_button",
-                                months=months,
-                                price=price,
-                                currency_symbol=currency_symbol_val)
-                builder.button(text=button_text,
-                               callback_data=f"subscribe_period:{months}")
+        for item in subscription_options:
+            if item.price is not None:
+                button_text = _(
+                    "subscribe_for_months_button",
+                    months=item.duration,
+                    price=item.price,
+                    currency_symbol=currency_symbol_val
+                )
+                callback_data = f"subscribe_period:{item.duration}:{subscription_id}" if subscription_id else f"subscribe_period:{item.duration}"
+                builder.button(
+                    text=button_text,
+                    callback_data=callback_data
+                )
         builder.adjust(1)
+
     builder.row(
         InlineKeyboardButton(text=_(key="back_to_main_menu_button"),
                              callback_data="main_action:back_to_main"))
     return builder.as_markup()
+
+
+def get_prolong_subscription_keyboard(
+    subscription_id: int,
+    lang: str,
+    i18n_instance
+):
+    _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
+    prolong_button = InlineKeyboardButton(
+        text=_(key="prolong_subscription"),
+        callback_data=f"main_action:subscribe:{subscription_id}"
+    )
+    back_markup = get_back_to_main_menu_markup(lang, i18n_instance)
+
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [prolong_button],
+            *back_markup.inline_keyboard,
+        ]
+    )
+
+    return kb
 
 
 def get_payment_method_keyboard(months: int, price: float,

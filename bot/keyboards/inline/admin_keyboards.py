@@ -3,6 +3,7 @@ from aiogram.types import InlineKeyboardMarkup, WebAppInfo
 from typing import Optional, List, Any
 import math
 
+from bot.helpers.keyboard_helpers import get_pagination_buttons
 from config.settings import Settings
 from bot.middlewares.i18n import JsonI18n
 from db.models import User
@@ -216,6 +217,14 @@ def get_banned_users_keyboard(banned_users: List[User], current_page: int,
                     text=_("next_page_button"),
                     callback_data=f"admin_action:view_banned:{current_page + 1}"
                 ))
+
+        pagination_buttons = get_pagination_buttons(
+            total_banned,
+            page_size,
+            current_page,
+            'admin_action:view_banned:',
+            lang,
+            i18n_instance)
         if pagination_buttons:
             builder.row(*pagination_buttons)
 

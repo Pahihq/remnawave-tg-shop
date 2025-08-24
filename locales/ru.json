@@ -55,6 +55,7 @@
   "traffic_na": "н/д",
   "error_service_unavailable": "Сервис временно недоступен. Пожалуйста, попробуйте позже.",
   "active_subscriptions": "Ваши активные подписки",
+  "prolong_subscription": "Продлить",
 
   "promo_code_prompt": "Пожалуйста, введите ваш промокод:",
   "promo_code_not_found": "Промокод <code>{code}</code> не найден, истек или уже использован максимальное количество раз.",

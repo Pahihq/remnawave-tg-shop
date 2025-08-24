@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config.settings import Settings
 from db.dal import payment_dal, subscription_dal
 from bot.keyboards.inline.user_keyboards import (
-    get_subscription_options_keyboard,
+    get_prolong_subscription_keyboard, get_subscription_options_keyboard,
     get_payment_method_keyboard,
     get_payment_url_keyboard,
     get_back_to_main_menu_markup,
@@ -22,6 +22,7 @@ from bot.services.subscription_service import SubscriptionService
 from bot.services.panel_api_service import PanelApiService
 from bot.services.referral_service import ReferralService
 from bot.middlewares.i18n import JsonI18n
+from db.dal.subscription_dal import get_subscription_by_user_id_and_subscription_uuid
 
 
 router = Router(name="user_subscription_router")
@@ -48,6 +49,7 @@ async def display_subscription_options(
             await event.answer(err_msg)
         return
 
+    subscription_id = event.data.split(":")[2] if isinstance(event, types.CallbackQuery) and len(event.data.split(":")) == 3 else None
     currency_symbol_val = settings.DEFAULT_CURRENCY_SYMBOL
     text_content = get_text(
         "select_subscription_period",
@@ -56,7 +58,11 @@ async def display_subscription_options(
     )
 
     reply_markup = get_subscription_options_keyboard(
-        settings.subscription_options, currency_symbol_val, current_lang, i18n,
+        settings.subscription_options,
+        currency_symbol_val,
+        subscription_id,
+        current_lang,
+        i18n,
     ) if settings.subscription_options else get_back_to_main_menu_markup(
         current_lang, i18n,
     )
@@ -118,7 +124,8 @@ async def select_subscription_period_callback_handler(
         await callback.answer(get_text("error_try_again"), show_alert=True)
         return
 
-    price_rub = settings.subscription_options.get(months)
+    subscription_options = SubscriptionService.find_dto_by_month(settings.subscription_options, months)
+    price_rub = subscription_options.price if subscription_options else None
     if price_rub is None:
         logging.error(
             f"Price not found for {months} months subscription period in settings.subscription_options.",
@@ -129,7 +136,8 @@ async def select_subscription_period_callback_handler(
     currency_symbol_val = settings.DEFAULT_CURRENCY_SYMBOL
     text_content = get_text("choose_payment_method")
     tribute_url = settings.tribute_payment_links.get(months)
-    stars_price = settings.stars_subscription_options.get(months)
+    subscription_options = SubscriptionService.find_dto_by_month(settings.stars_subscription_options, months)
+    stars_price = subscription_options.price if subscription_options else None
     reply_markup = get_payment_method_keyboard(
         months,
         price_rub,
@@ -411,11 +419,14 @@ async def my_subscription_command_handler(
     session: AsyncSession,
     bot: Bot,
 ):
+    """
+    Show available user subscriptions
+    """
     target = event.message if isinstance(event, types.CallbackQuery) else event
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: JsonI18n = i18n_data.get("i18n_instance")
     get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
-    current_page =
+    current_page = int(event.data.split(':')[2]) if len(event.data.split(':')) == 3 else 0
 
     if not i18n or not target:
         if isinstance(event, types.Message):
@@ -426,6 +437,16 @@ async def my_subscription_command_handler(
         await target.answer(get_text("error_service_unavailable"))
         return
     subscriptions_ids = await subscription_dal.get_subscriptions_by_user_id(session, event.from_user.id)
+    total_subscriptions = await subscription_dal.get_all_subscriptions_by_user_id_count(session, event.from_user.id)
+    page_size = settings.LOGS_PAGE_SIZE
+
+    offset =  page_size * current_page
+    subscriptions_ids = await subscription_dal.get_subscriptions_by_user_id(
+        session,
+        event.from_user.id,
+        limit=page_size,
+        offset=offset,
+    )
 
     if not subscriptions_ids:
         text = get_text("subscription_not_active")
@@ -446,7 +467,14 @@ async def my_subscription_command_handler(
 
     text = get_text("active_subscriptions")
 
-    markup = get_user_subscriptions_keyboard(subscriptions_ids, len(subscriptions_ids),  current_lang, i18n)
+    markup = get_user_subscriptions_keyboard(
+        subscriptions_ids,
+        total_subscriptions,
+        current_page,
+        current_lang,
+        i18n
+    )
+
     if isinstance(event, types.CallbackQuery):
         await event.answer()
         try:
@@ -474,8 +502,11 @@ async def show_current_subscription_handler(
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: JsonI18n = i18n_data.get("i18n_instance")
     get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
-
-    active = await subscription_service.get_active_subscription_details(session, event.from_user.id)
+    subscription_id = event.data.split(':')[1]
+    if not subscription_id.isdigit():
+        active = None
+    else:
+        active = await get_subscription_by_user_id_and_subscription_uuid(session, event.from_user.id, int(subscription_id))
 
     if not active:
         text = get_text("subscription_not_active")
@@ -503,7 +534,7 @@ async def show_current_subscription_handler(
             await event.answer(text, reply_markup=kb)
         return
 
-    end_date = active.get("end_date")
+    end_date = active.end_date
     days_left = (
         (end_date.date() - datetime.now().date()).days
         if end_date else 0
@@ -525,7 +556,7 @@ async def show_current_subscription_handler(
             else get_text("traffic_na")
         ),
     )
-    markup = get_back_to_main_menu_markup(current_lang, i18n)
+    markup = get_prolong_subscription_keyboard(1, current_lang, i18n)
 
     if isinstance(event, types.CallbackQuery):
         await event.answer()

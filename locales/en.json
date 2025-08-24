@@ -55,6 +55,7 @@
   "traffic_na": "n/a",
   "error_service_unavailable": "Service temporarily unavailable. Please try again later.",
   "active_subscriptions": "Your active subscriptions",
+  "prolong_subscription": "Prolong",
 
   "promo_code_prompt": "Please enter your promo code:",
   "promo_code_not_found": "Promo code <code>{code}</code> not found, expired, or already used the maximum number of times.",

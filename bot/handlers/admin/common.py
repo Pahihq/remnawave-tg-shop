@@ -54,8 +54,7 @@ async def admin_panel_actions_callback_handler(
         callback: types.CallbackQuery, state: FSMContext, settings: Settings,
         i18n_data: dict, bot: Bot, panel_service: PanelApiService,
         subscription_service: SubscriptionService, session: AsyncSession):
-    action_par
-    ts = callback.data.split(":")
+    action_parts = callback.data.split(":")
     action = action_parts[1]
 
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)

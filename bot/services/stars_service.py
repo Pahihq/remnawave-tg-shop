@@ -47,6 +47,7 @@ class StarsService:
 
         payload = f"{db_payment_record.payment_id}:{months}"
         prices = [LabeledPrice(label=description, amount=stars_price)]
+        print(f"{months=} {prices=}")
         try:
             await self.bot.send_invoice(
                 chat_id=user_id,

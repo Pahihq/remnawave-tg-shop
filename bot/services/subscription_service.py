@@ -10,6 +10,7 @@ from db.models import User, Subscription
 
 from config.settings import Settings
 from .panel_api_service import PanelApiService
+from ..dto.subscription_dto import SubscriptionOptions
 
 
 class SubscriptionService:
@@ -25,6 +26,10 @@ class SubscriptionService:
         self.panel_service = panel_service
         self.bot = bot
         self.i18n = i18n
+
+    @staticmethod
+    def find_dto_by_month(subscription_options: List[SubscriptionOptions], value: int) -> Optional[SubscriptionOptions]:
+        return next((option for option in subscription_options if option.duration == value), None)
 
     async def get_user_language(self, session: AsyncSession, user_id: int) -> str:
         user_record = await user_dal.get_user_by_id(session, user_id)
@@ -616,6 +621,98 @@ class SubscriptionService:
 
     async def get_active_subscription_details(
         self, session: AsyncSession, user_id: int
+    ) -> Optional[Dict[str, Any]]:
+        db_user = await user_dal.get_user_by_id(session, user_id)
+        if not db_user or not db_user.panel_user_uuid:
+            logging.info(
+                f"User {user_id} not found in DB or no panel_user_uuid for 'my_subscription'."
+            )
+            return None
+
+        panel_user_uuid = db_user.panel_user_uuid
+        local_active_sub = await subscription_dal.get_active_subscription_by_user_id(
+            session, user_id, panel_user_uuid
+        )
+        panel_user_data = await self.panel_service.get_user_by_uuid(panel_user_uuid)
+
+        if not panel_user_data:
+            logging.warning(
+                f"Panel user {panel_user_uuid} not found on panel for user {user_id}. Clearing local linkage."
+            )
+            await subscription_dal.deactivate_all_user_subscriptions(session, user_id)
+            await user_dal.update_user(session, user_id, {"panel_user_uuid": None})
+            return None
+
+        if local_active_sub:
+            update_payload_local = {}
+            panel_status = panel_user_data.get("status", "UNKNOWN").upper()
+            panel_expire_at_str = panel_user_data.get("expireAt")
+            panel_traffic_used = panel_user_data.get("usedTrafficBytes")
+            panel_traffic_limit = panel_user_data.get("trafficLimitBytes")
+            panel_sub_uuid_from_panel = panel_user_data.get(
+                "subscriptionUuid"
+            ) or panel_user_data.get("shortUuid")
+
+            if local_active_sub.status_from_panel != panel_status:
+                update_payload_local["status_from_panel"] = panel_status
+            if panel_expire_at_str:
+                panel_expire_dt = datetime.fromisoformat(
+                    panel_expire_at_str.replace("Z", "+00:00")
+                )
+                if local_active_sub.end_date.replace(
+                    microsecond=0
+                ) != panel_expire_dt.replace(microsecond=0):
+                    update_payload_local["end_date"] = panel_expire_dt
+                    update_payload_local["last_notification_sent"] = None
+            if (
+                panel_traffic_used is not None
+                and local_active_sub.traffic_used_bytes != panel_traffic_used
+            ):
+                update_payload_local["traffic_used_bytes"] = panel_traffic_used
+            if (
+                panel_traffic_limit is not None
+                and local_active_sub.traffic_limit_bytes != panel_traffic_limit
+            ):
+                update_payload_local["traffic_limit_bytes"] = panel_traffic_limit
+            if (
+                panel_sub_uuid_from_panel
+                and local_active_sub.panel_subscription_uuid
+                != panel_sub_uuid_from_panel
+            ):
+                update_payload_local["panel_subscription_uuid"] = (
+                    panel_sub_uuid_from_panel
+                )
+
+            is_active_based_on_panel = panel_status == "ACTIVE" and (
+                panel_expire_dt > datetime.now(timezone.utc)
+                if panel_expire_dt
+                else False
+            )
+            if local_active_sub.is_active != is_active_based_on_panel:
+                update_payload_local["is_active"] = is_active_based_on_panel
+
+            if update_payload_local:
+                await subscription_dal.update_subscription(
+                    session, local_active_sub.subscription_id, update_payload_local
+                )
+
+        panel_end_date = (
+            datetime.fromisoformat(panel_user_data["expireAt"].replace("Z", "+00:00"))
+            if panel_user_data.get("expireAt")
+            else None
+        )
+
+        return {
+            "end_date": panel_end_date,
+            "status_from_panel": panel_user_data.get("status", "UNKNOWN").upper(),
+            "config_link": panel_user_data.get("subscriptionUrl"),
+            "traffic_limit_bytes": panel_user_data.get("trafficLimitBytes"),
+            "traffic_used_bytes": panel_user_data.get("usedTrafficBytes"),
+            "user_bot_username": db_user.username,
+            "is_panel_data": True,
+        }
+    async def get_subscription_details(
+        self, session: AsyncSession, user_id: int, subscription_id: int
     ) -> Optional[Dict[str, Any]]:
         db_user = await user_dal.get_user_by_id(session, user_id)
         if not db_user or not db_user.panel_user_uuid:
