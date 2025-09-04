@@ -6,6 +6,7 @@ from aiogram import Bot
 from bot.middlewares.i18n import JsonI18n
 
 from db.dal import user_dal, subscription_dal, promo_code_dal, payment_dal
+from bot.utils.date_utils import add_months
 from db.models import User, Subscription
 
 from config.settings import Settings
@@ -118,6 +119,11 @@ class SubscriptionService:
                     creation_response = await self.panel_service.create_panel_user(
                         username_on_panel=panel_username_on_panel_standard,
                         telegram_id=user_id,
+                        description="\n".join([
+                            (db_user.username or "") if db_user else "",
+                            (db_user.first_name or "") if db_user else "",
+                            (db_user.last_name or "") if db_user else "",
+                        ]),
                         specific_squad_uuids=self.settings.parsed_user_squad_uuids,
                         default_traffic_limit_bytes=self.settings.user_traffic_limit_bytes,
                         default_traffic_limit_strategy=self.settings.USER_TRAFFIC_STRATEGY,
@@ -141,6 +147,11 @@ class SubscriptionService:
                 creation_response = await self.panel_service.create_panel_user(
                     username_on_panel=panel_username_on_panel_standard,
                     telegram_id=user_id,
+                    description="\n".join([
+                        (db_user.username or "") if db_user else "",
+                        (db_user.first_name or "") if db_user else "",
+                        (db_user.last_name or "") if db_user else "",
+                    ]),
                     specific_squad_uuids=self.settings.parsed_user_squad_uuids,
                     default_traffic_limit_bytes=self.settings.user_traffic_limit_bytes,
                     default_traffic_limit_strategy=self.settings.USER_TRAFFIC_STRATEGY,
@@ -232,23 +243,10 @@ class SubscriptionService:
                     "panel_user_uuid": actual_panel_uuid_from_api
                 }
 
-                if (
-                    actual_panel_username_from_api
-                    and actual_panel_username_from_api
-                    != panel_username_on_panel_standard
-                    and (
-                        db_user.username is None
-                        or db_user.username != actual_panel_username_from_api
-                    )
-                ):
-                    update_data_for_local_user["username"] = (
-                        actual_panel_username_from_api
-                    )
-
+                # Do not overwrite Telegram username with panel username.
+                # Only update the local linkage to panel UUID here.
                 await user_dal.update_user(session, user_id, update_data_for_local_user)
                 db_user.panel_user_uuid = actual_panel_uuid_from_api
-                if "username" in update_data_for_local_user:
-                    db_user.username = update_data_for_local_user["username"]
                 panel_user_created_or_linked_now = True
                 current_local_panel_uuid = actual_panel_uuid_from_api
         else:
@@ -270,8 +268,19 @@ class SubscriptionService:
             logging.info(
                 f"Panel user {current_local_panel_uuid} has telegramId '{panel_telegram_id_from_api}'. Updating on panel to '{user_id}'."
             )
+            # Also set readable description with Telegram fields
             await self.panel_service.update_user_details_on_panel(
-                current_local_panel_uuid, {"telegramId": user_id}
+                current_local_panel_uuid,
+                {
+                    "telegramId": user_id,
+                    "description": "\n".join(
+                        [
+                            (db_user.username or "") if db_user else "",
+                            (db_user.first_name or "") if db_user else "",
+                            (db_user.last_name or "") if db_user else "",
+                        ]
+                    ),
+                },
             )
 
         panel_sub_link_id = panel_user_obj_from_api.get(
@@ -368,6 +377,15 @@ class SubscriptionService:
             traffic_limit_bytes=self.settings.trial_traffic_limit_bytes,
         )
 
+        # Add user description based on Telegram profile
+        panel_update_payload["description"] = "\n".join(
+            [
+                (db_user.username or "") if db_user else "",
+                (db_user.first_name or "") if db_user else "",
+                (db_user.last_name or "") if db_user else "",
+            ]
+        )
+
         updated_panel_user = await self.panel_service.update_user_details_on_panel(
             panel_user_uuid, panel_update_payload
         )
@@ -437,7 +455,9 @@ class SubscriptionService:
         ):
             start_date = current_active_sub.end_date
 
-        duration_days_total = months * 30
+        # base duration by months
+        end_after_months = add_months(start_date, months)
+        duration_days_total = (end_after_months - start_date).days
         applied_promo_bonus_days = 0
 
         if promo_code_id_from_payment:
@@ -506,6 +526,15 @@ class SubscriptionService:
             expire_at=final_end_date,
             status="ACTIVE",
             traffic_limit_bytes=self.settings.user_traffic_limit_bytes,
+        )
+
+        # Add user description based on Telegram profile
+        panel_update_payload["description"] = "\n".join(
+            [
+                (db_user.username or "") if db_user else "",
+                (db_user.first_name or "") if db_user else "",
+                (db_user.last_name or "") if db_user else "",
+            ]
         )
 
         updated_panel_user = await self.panel_service.update_user_details_on_panel(
