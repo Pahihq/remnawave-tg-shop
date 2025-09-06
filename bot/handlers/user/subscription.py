@@ -410,6 +410,88 @@ async def reshow_subscription_options_callback(
     await display_subscription_options(callback, i18n_data, settings, session)
 
 
+@router.callback_query(F.data.startswith("show_subscription:"))
+async def show_current_subscription_handler(
+    callback: types.CallbackQuery,
+    i18n_data: dict,
+    settings: Settings,
+    panel_service: PanelApiService,
+    subscription_service: SubscriptionService,
+    session: AsyncSession,
+    bot: Bot,
+):
+    subscription_id = callback.data.split(':')[1]
+    target = callback.message if isinstance(callback, types.CallbackQuery) else callback
+    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
+    i18n: JsonI18n = i18n_data.get("i18n_instance")
+    get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
+    if not subscription_id.isdigit():
+        active = None
+    else:
+        active = await subscription_service.get_subscription_details(session, callback.from_user.id, int(subscription_id))
+    if not active:
+        text = get_text("subscription_not_active")
+
+        buy_button = InlineKeyboardButton(
+            text=get_text("menu_subscribe_inline", default="Купить"),
+            callback_data="main_action:subscribe",
+        )
+        back_markup = get_back_to_main_menu_markup(current_lang, i18n)
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [buy_button],
+                *back_markup.inline_keyboard,
+            ],
+        )
+
+        if isinstance(callback, types.CallbackQuery):
+            await callback.answer()
+            try:
+                await callback.message.edit_text(text, reply_markup=kb)
+            except:
+                await callback.message.answer(text, reply_markup=kb)
+        else:
+            await callback.answer(text, reply_markup=kb)
+        return
+
+    end_date = active.end_date
+    days_left = (
+        (end_date.date() - datetime.now().date()).days
+        if end_date else 0
+    )
+    text = get_text(
+        "my_subscription_details",
+        end_date=end_date.strftime("%Y-%m-%d") if end_date else "N/A",
+        days_left=max(0, days_left),
+        status=active.status_from_panel.capitalize() if active.status_from_panel else get_text("status_active").capitalize(),
+        config_link=active.config_link or get_text("config_link_not_available"),
+        traffic_limit=(
+            f"{active.traffic_limit_bytes / 2 ** 30:.2f} GB"
+            if active.traffic_limit_bytes
+            else get_text("traffic_unlimited")
+        ),
+        traffic_used=(
+            f"{active['traffic_used_bytes'] / 2 ** 30:.2f} GB"
+            if active.traffic_used_bytes is not None
+            else get_text("traffic_na")
+        ),
+    )
+    markup = get_prolong_subscription_keyboard(1, current_lang, i18n)
+
+    if isinstance(callback, types.CallbackQuery):
+        await callback.answer()
+        try:
+            await callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
+        except:
+            await bot.send_message(
+                chat_id=target.chat.id, text=text, reply_markup=markup, parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+    else:
+        await target.answer(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
+
+
 async def my_subscription_command_handler(
     event: Union[types.Message, types.CallbackQuery],
     i18n_data: dict,
@@ -436,10 +518,10 @@ async def my_subscription_command_handler(
     if not panel_service or not subscription_service:
         await target.answer(get_text("error_service_unavailable"))
         return
-    subscriptions_ids = await subscription_dal.get_subscriptions_by_user_id(session, event.from_user.id)
     total_subscriptions = await subscription_dal.get_all_subscriptions_by_user_id_count(session, event.from_user.id)
     page_size = settings.LOGS_PAGE_SIZE
 
+    # TODO: вынести логику с пагинацией, избавиться от хардкода
     offset =  page_size * current_page
     subscriptions_ids = await subscription_dal.get_subscriptions_by_user_id(
         session,
@@ -474,89 +556,6 @@ async def my_subscription_command_handler(
         current_lang,
         i18n
     )
-
-    if isinstance(event, types.CallbackQuery):
-        await event.answer()
-        try:
-            await event.message.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
-        except:
-            await bot.send_message(
-                chat_id=target.chat.id, text=text, reply_markup=markup, parse_mode="HTML",
-                disable_web_page_preview=True,
-            )
-    else:
-        await target.answer(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
-
-
-@router.callback_query(F.data.startswith("show_subscription:"))
-async def show_current_subscription_handler(
-    event: Union[types.Message, types.CallbackQuery],
-    i18n_data: dict,
-    settings: Settings,
-    panel_service: PanelApiService,
-    subscription_service: SubscriptionService,
-    session: AsyncSession,
-    bot: Bot,
-):
-    target = event.message if isinstance(event, types.CallbackQuery) else event
-    current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
-    i18n: JsonI18n = i18n_data.get("i18n_instance")
-    get_text = lambda key, **kw: i18n.gettext(current_lang, key, **kw)
-    subscription_id = event.data.split(':')[1]
-    if not subscription_id.isdigit():
-        active = None
-    else:
-        active = await get_subscription_by_user_id_and_subscription_uuid(session, event.from_user.id, int(subscription_id))
-
-    if not active:
-        text = get_text("subscription_not_active")
-
-        buy_button = InlineKeyboardButton(
-            text=get_text("menu_subscribe_inline", default="Купить"),
-            callback_data="main_action:subscribe",
-        )
-        back_markup = get_back_to_main_menu_markup(current_lang, i18n)
-
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [buy_button],
-                *back_markup.inline_keyboard,
-            ],
-        )
-
-        if isinstance(event, types.CallbackQuery):
-            await event.answer()
-            try:
-                await event.message.edit_text(text, reply_markup=kb)
-            except:
-                await event.message.answer(text, reply_markup=kb)
-        else:
-            await event.answer(text, reply_markup=kb)
-        return
-
-    end_date = active.end_date
-    days_left = (
-        (end_date.date() - datetime.now().date()).days
-        if end_date else 0
-    )
-    text = get_text(
-        "my_subscription_details",
-        end_date=end_date.strftime("%Y-%m-%d") if end_date else "N/A",
-        days_left=max(0, days_left),
-        status=active.get("status_from_panel", get_text("status_active")).capitalize(),
-        config_link=active.get("config_link") or get_text("config_link_not_available"),
-        traffic_limit=(
-            f"{active['traffic_limit_bytes'] / 2 ** 30:.2f} GB"
-            if active.get("traffic_limit_bytes")
-            else get_text("traffic_unlimited")
-        ),
-        traffic_used=(
-            f"{active['traffic_used_bytes'] / 2 ** 30:.2f} GB"
-            if active.get("traffic_used_bytes") is not None
-            else get_text("traffic_na")
-        ),
-    )
-    markup = get_prolong_subscription_keyboard(1, current_lang, i18n)
 
     if isinstance(event, types.CallbackQuery):
         await event.answer()

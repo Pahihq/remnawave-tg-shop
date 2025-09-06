@@ -10,7 +10,7 @@ from db.models import User, Subscription
 
 from config.settings import Settings
 from .panel_api_service import PanelApiService
-from ..dto.subscription_dto import SubscriptionOptions
+from ..dto.subscription_dto import SubscriptionDetails, SubscriptionOptions
 
 
 class SubscriptionService:
@@ -42,22 +42,11 @@ class SubscriptionService:
     async def has_had_any_subscription(self, session: AsyncSession, user_id: int) -> bool:
         return await subscription_dal.has_any_subscription_for_user(session, user_id)
 
-    async def _notify_admin_panel_user_creation_failed(self, user_id: int):
-        if not self.bot or not self.i18n or not self.settings.ADMIN_IDS:
-            return
-        admin_lang = self.settings.DEFAULT_LANGUAGE
-        _adm = lambda k, **kw: self.i18n.gettext(admin_lang, k, **kw)
-        msg = _adm("admin_panel_user_creation_failed", user_id=user_id)
-        for admin_id in self.settings.ADMIN_IDS:
-            try:
-                await self.bot.send_message(admin_id, msg)
-            except Exception as e:
-                logging.error(
-                    f"Failed to notify admin {admin_id} about panel user creation failure: {e}"
-                )
-
-    async def _get_or_create_panel_user_link_details(
-        self, session: AsyncSession, user_id: int, db_user: Optional[User] = None
+    async def get_or_create_panel_user_link_details(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        db_user: Optional[User] = None
     ) -> Tuple[Optional[str], Optional[str], Optional[str], bool]:
         if not db_user:
             db_user = await user_dal.get_user_by_id(session, user_id)
@@ -307,7 +296,7 @@ class SubscriptionService:
             }
 
         panel_user_uuid, panel_sub_link_id, panel_short_uuid, panel_user_created_now = (
-            await self._get_or_create_panel_user_link_details(session, user_id, db_user)
+            await self.get_or_create_panel_user_link_details(session, user_id, db_user)
         )
 
         if not panel_user_uuid or not panel_sub_link_id:
@@ -409,7 +398,7 @@ class SubscriptionService:
             return None
 
         panel_user_uuid, panel_sub_link_id, panel_short_uuid, panel_user_created_now = (
-            await self._get_or_create_panel_user_link_details(session, user_id, db_user)
+            await self.get_or_create_panel_user_link_details(session, user_id, db_user)
         )
 
         if not panel_user_uuid or not panel_sub_link_id:
@@ -537,7 +526,7 @@ class SubscriptionService:
             )
             return None
 
-        panel_uuid, panel_sub_uuid, _, _ = await self._get_or_create_panel_user_link_details(
+        panel_uuid, panel_sub_uuid, _, _ = await self.get_or_create_panel_user_link_details(
             session, user_id, user
         )
         if not panel_uuid or not panel_sub_uuid:
@@ -620,7 +609,9 @@ class SubscriptionService:
             return None
 
     async def get_active_subscription_details(
-        self, session: AsyncSession, user_id: int
+        self,
+        session: AsyncSession,
+        user_id: int
     ) -> Optional[Dict[str, Any]]:
         db_user = await user_dal.get_user_by_id(session, user_id)
         if not db_user or not db_user.panel_user_uuid:
@@ -711,9 +702,17 @@ class SubscriptionService:
             "user_bot_username": db_user.username,
             "is_panel_data": True,
         }
+
     async def get_subscription_details(
-        self, session: AsyncSession, user_id: int, subscription_id: int
-    ) -> Optional[Dict[str, Any]]:
+        self,
+        session: AsyncSession,
+        user_id: int,
+        subscription_id: int
+    ) -> Optional[SubscriptionDetails]:
+        """
+        Get specific subscription details.
+        subscription selecting by subscription_id and user_id
+        """
         db_user = await user_dal.get_user_by_id(session, user_id)
         if not db_user or not db_user.panel_user_uuid:
             logging.info(
@@ -721,7 +720,8 @@ class SubscriptionService:
             )
             return None
 
-        panel_user_uuid = db_user.panel_user_uuid
+        subscription = await subscription_dal.get_subscription_by_id(session, subscription_id, user_id)
+        panel_user_uuid = subscription.panel_user_uuid
         local_active_sub = await subscription_dal.get_active_subscription_by_user_id(
             session, user_id, panel_user_uuid
         )
@@ -794,15 +794,18 @@ class SubscriptionService:
             else None
         )
 
-        return {
-            "end_date": panel_end_date,
-            "status_from_panel": panel_user_data.get("status", "UNKNOWN").upper(),
-            "config_link": panel_user_data.get("subscriptionUrl"),
-            "traffic_limit_bytes": panel_user_data.get("trafficLimitBytes"),
-            "traffic_used_bytes": panel_user_data.get("usedTrafficBytes"),
-            "user_bot_username": db_user.username,
-            "is_panel_data": True,
-        }
+        subscription_details = SubscriptionDetails(
+            end_date=panel_end_date,
+            status_from_panel=panel_user_data.get("status", "UNKNOWN").upper(),
+            config_link=panel_user_data.get("subscriptionUrl"),
+            traffic_limit_bytes=panel_user_data.get("trafficLimitBytes"),
+            traffic_used_bytes=panel_user_data.get("usedTrafficBytes"),
+            user_bot_username= db_user.username,
+            is_panel_data=True
+        )
+
+        return subscription_details
+
 
     async def get_subscriptions_ending_soon(
         self, session: AsyncSession, days_threshold: int
@@ -855,6 +858,20 @@ class SubscriptionService:
             logging.warning(
                 f"Could not find subscription for user {user_id} ending at {subscription_end_date.isoformat()} to update notification time."
             )
+
+    async def _notify_admin_panel_user_creation_failed(self, user_id: int):
+        if not self.bot or not self.i18n or not self.settings.ADMIN_IDS:
+            return
+        admin_lang = self.settings.DEFAULT_LANGUAGE
+        _adm = lambda k, **kw: self.i18n.gettext(admin_lang, k, **kw)
+        msg = _adm("admin_panel_user_creation_failed", user_id=user_id)
+        for admin_id in self.settings.ADMIN_IDS:
+            try:
+                await self.bot.send_message(admin_id, msg)
+            except Exception as e:
+                logging.error(
+                    f"Failed to notify admin {admin_id} about panel user creation failure: {e}"
+                )
 
     # Helpers
     def _build_panel_update_payload(

@@ -1,5 +1,7 @@
 import logging
 from typing import Optional, List, Dict, Any, Sequence
+
+from requests import session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, func, and_, or_
@@ -60,6 +62,19 @@ async def get_all_subscriptions_by_user_id_count(
     result = await session.scalar(stmt)
     return result
 
+async def get_subscription_by_id(
+    session: AsyncSession,
+    subscription_id: int,
+    user_id: int
+) -> Subscription:
+    stmt = select(
+        Subscription
+    ).where(
+        Subscription.subscription_id == subscription_id,
+        Subscription.user_id == user_id,
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 async def get_active_subscriptions_by_user_id(
     session: AsyncSession,

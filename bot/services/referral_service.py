@@ -68,7 +68,7 @@ class ReferralService:
                     )
                 else:
 
-                    inviter_panel_uuid, inviter_panel_sub_link_id, _, _ = await self.subscription_service._get_or_create_panel_user_link_details(
+                    inviter_panel_uuid, inviter_panel_sub_link_id, _, _ = await self.subscription_service.get_or_create_panel_user_link_details(
                         session, inviter_user_id, inviter_user_model)
 
                     if not inviter_panel_uuid:
