@@ -12,12 +12,14 @@ from config.settings import Settings
 
 class YooKassaService:
 
-    def __init__(self,
-                 shop_id: Optional[str],
-                 secret_key: Optional[str],
-                 configured_return_url: Optional[str],
-                 bot_username_for_default_return: Optional[str] = None,
-                 settings_obj: Optional[Settings] = None):
+    def __init__(
+        self,
+        shop_id: Optional[str],
+        secret_key: Optional[str],
+        configured_return_url: Optional[str],
+        bot_username_for_default_return: Optional[str] = None,
+        settings_obj: Optional[Settings] = None
+    ):
 
         self.settings = settings_obj
 

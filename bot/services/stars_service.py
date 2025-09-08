@@ -12,9 +12,11 @@ from .referral_service import ReferralService
 from bot.middlewares.i18n import JsonI18n
 from .notification_service import NotificationService
 from bot.keyboards.inline.user_keyboards import get_connect_and_main_keyboard
+from ..contracts.invoice_service_interface import InvoiceServiceInterface
+from ..enums.invoice_enum import InvoiceEnum
 
 
-class StarsService:
+class StarsService(InvoiceServiceInterface):
     def __init__(self, bot: Bot, settings: Settings, i18n: JsonI18n,
                  subscription_service: SubscriptionService,
                  referral_service: ReferralService):
@@ -45,7 +47,7 @@ class StarsService:
                           exc_info=True)
             return None
 
-        payload = f"{db_payment_record.payment_id}:{months}"
+        payload = f"{InvoiceEnum.STARS_SERVICE}:{db_payment_record.payment_id}:{months}"
         prices = [LabeledPrice(label=description, amount=stars_price)]
         print(f"{months=} {prices=}")
         try:
@@ -69,7 +71,8 @@ class StarsService:
                                          payment_db_id: int,
                                          months: int,
                                          stars_amount: int,
-                                         i18n_data: dict) -> None:
+                                         i18n_data: dict,
+                                         currency: str) -> None:
         try:
             await payment_dal.update_provider_payment_and_status(
                 session, payment_db_id,

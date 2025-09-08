@@ -9,6 +9,8 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
+
+from bot.repositories.invoice_service_repository import InvoiceServiceRepository
 from bot.services.panel_webhook_service import PanelWebhookService, panel_webhook_route
 from sqlalchemy.orm import sessionmaker
 
@@ -297,6 +299,10 @@ async def run_bot(settings_param: Settings):
         i18n_instance,
         local_async_session_factory,
     )
+    invoice_service_repository = InvoiceServiceRepository({
+        "stars_service": stars_service,
+        "yookassa_service": yookassa_service,
+    })
 
     dp["i18n_instance"] = i18n_instance
     dp["yookassa_service"] = yookassa_service
@@ -309,6 +315,7 @@ async def run_bot(settings_param: Settings):
     dp["tribute_service"] = tribute_service
     dp["panel_webhook_service"] = panel_webhook_service
     dp["async_session_factory"] = local_async_session_factory
+    dp["invoice_service_repository"] = invoice_service_repository
 
     dp.update.outer_middleware(DBSessionMiddleware(local_async_session_factory))
     dp.update.outer_middleware(

@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any, Union
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.repositories.invoice_service_repository import InvoiceServiceRepository
 from config.settings import Settings
 from db.dal import payment_dal, subscription_dal
 from bot.keyboards.inline.user_keyboards import (
@@ -522,7 +523,7 @@ async def my_subscription_command_handler(
     page_size = settings.LOGS_PAGE_SIZE
 
     # TODO: вынести логику с пагинацией, избавиться от хардкода
-    offset =  page_size * current_page
+    offset = page_size * current_page
     subscriptions_ids = await subscription_dal.get_subscriptions_by_user_id(
         session,
         event.from_user.id,
@@ -571,31 +572,40 @@ async def my_subscription_command_handler(
 
 
 @router.pre_checkout_query()
-async def stars_pre_checkout_handler(pre_checkout_query: types.PreCheckoutQuery):
+async def pre_checkout_handler(pre_checkout_query: types.PreCheckoutQuery):
     await pre_checkout_query.answer(ok=True)
 
 
 @router.message(F.successful_payment)
-async def stars_successful_payment_handler(
-    message: types.Message, settings: Settings, i18n_data: dict,
-    session: AsyncSession, stars_service: StarsService,
+async def successful_payment_handler(
+    message: types.Message,
+    settings: Settings,
+    i18n_data: dict,
+    session: AsyncSession,
+    invoice_service_repository: InvoiceServiceRepository,
 ):
     sp = message.successful_payment
-    if not sp or sp.currency != "XTR":
+    if not sp:
         return
 
     payload = sp.invoice_payload or ""
     try:
-        payment_id_str, months_str = payload.split(":")
+        service, payment_id_str, months_str = payload.split(":")
         payment_db_id = int(payment_id_str)
         months = int(months_str)
     except (ValueError, IndexError):
         logging.error(f"Invalid invoice payload for stars payment: {payload}")
         return
 
-    stars_amount = sp.total_amount
-    await stars_service.process_successful_payment(
-        session, message, payment_db_id, months, stars_amount, i18n_data,
+    amount = sp.total_amount
+    currency = sp.currency
+
+    invoice_service = invoice_service_repository.get(service)
+    if not invoice_service:
+        logging.error(f"Cant find service for invoice payment: {payload}")
+
+    await invoice_service.process_successful_payment(
+        session, message, payment_db_id, months, amount, currency, i18n_data
     )
 
 
