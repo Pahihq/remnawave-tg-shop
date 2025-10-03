@@ -7,10 +7,11 @@ from yookassa import Configuration, Payment as YooKassaPayment
 from yookassa.domain.request.payment_request_builder import PaymentRequestBuilder
 from yookassa.domain.common.confirmation_type import ConfirmationType
 
+from bot.contracts.yookassa_service_interface import YookassaServiceInterface
 from config.settings import Settings
 
 
-class YooKassaService:
+class YooKassaService(YookassaServiceInterface):
 
     def __init__(
         self,

@@ -36,7 +36,7 @@ async def request_trial_confirmation_handler(
 
     show_trial_btn_in_menu_if_fail = False
     if settings.TRIAL_ENABLED:
-        if not await subscription_service.has_had_any_subscription(session, user_id):
+        if not await subscription_service.has_any_subscription(session, user_id):
             show_trial_btn_in_menu_if_fail = True
 
     if not settings.TRIAL_ENABLED:
@@ -49,7 +49,7 @@ async def request_trial_confirmation_handler(
         await callback.answer()
         return
 
-    if await subscription_service.has_had_any_subscription(session, user_id):
+    if await subscription_service.has_any_subscription(session, user_id):
         await callback.message.edit_text(
             _("trial_already_had_subscription_or_trial"),
             reply_markup=get_main_menu_inline_keyboard(
@@ -109,7 +109,7 @@ async def request_trial_confirmation_handler(
         await callback.answer(final_message_text_in_chat, show_alert=True)
         if (
             settings.TRIAL_ENABLED
-            and not await subscription_service.has_had_any_subscription(
+            and not await subscription_service.has_any_subscription(
                 session, user_id
             )
         ):
@@ -170,7 +170,7 @@ async def confirm_activate_trial_handler(
             callback, settings, i18n_data, subscription_service, session, is_edit=True
         )
         return
-    if await subscription_service.has_had_any_subscription(session, user_id):
+    if await subscription_service.has_any_subscription(session, user_id):
         await callback.answer(
             _("trial_already_had_subscription_or_trial"), show_alert=True
         )
@@ -224,7 +224,7 @@ async def confirm_activate_trial_handler(
         await callback.answer(final_message_text_in_chat, show_alert=True)
         if (
             settings.TRIAL_ENABLED
-            and not await subscription_service.has_had_any_subscription(
+            and not await subscription_service.has_any_subscription(
                 session, user_id
             )
         ):

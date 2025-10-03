@@ -64,7 +64,7 @@ async def send_main_menu(
         ) and callable(
             getattr(subscription_service, 'has_had_any_subscription'),
         ):
-            if not await subscription_service.has_had_any_subscription(
+            if not await subscription_service.has_any_subscription(
                     session, user_id,
             ):
                 show_trial_button_in_menu = True

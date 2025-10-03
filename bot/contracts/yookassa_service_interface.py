@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from config.settings import Settings
 
@@ -22,14 +22,22 @@ class YookassaServiceInterface(ABC):
         self.settings_obj = settings_obj,
 
     @abstractmethod
-    async def create_payment(self):
+    async def create_payment(
+        self,
+        amount: float,
+        currency: str,
+        description: str,
+        metadata: Dict[str, Any],
+        receipt_email: Optional[str] = None,
+        receipt_phone: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """
         Must create new payment
         """
         pass
 
     @abstractmethod
-    async def get_payment(self):
+    async def get_payment(self, payment_id_in_yookassa: str) -> Optional[Dict[str, Any]]:
         """
         Get information about the payment
         """

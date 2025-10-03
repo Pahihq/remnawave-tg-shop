@@ -39,7 +39,7 @@ class SubscriptionService:
             else self.settings.DEFAULT_LANGUAGE
         )
 
-    async def has_had_any_subscription(self, session: AsyncSession, user_id: int) -> bool:
+    async def has_any_subscription(self, session: AsyncSession, user_id: int) -> bool:
         return await subscription_dal.has_any_subscription_for_user(session, user_id)
 
     async def get_or_create_panel_user_link_details(
@@ -288,7 +288,7 @@ class SubscriptionService:
                 "message_key": "user_not_found_for_trial",
             }
 
-        if await self.has_had_any_subscription(session, user_id):
+        if await self.has_any_subscription(session, user_id):
             return {
                 "eligible": False,
                 "activated": False,

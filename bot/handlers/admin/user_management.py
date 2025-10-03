@@ -171,7 +171,7 @@ async def format_user_card(user: User, session: AsyncSession,
         card_parts.append(f"{_('admin_user_actions_count_label', default='📜 <b>Всего действий:</b>')} {hcode(str(logs_count))}")
         
         # Check if user had any subscriptions
-        had_subscriptions = await subscription_service.has_had_any_subscription(session, user.user_id)
+        had_subscriptions = await subscription_service.has_any_subscription(session, user.user_id)
         trial_status = _("admin_user_trial_used", default="Использовал") if had_subscriptions else _("admin_user_trial_not_used", default="Не использовал")
         card_parts.append(f"{_('admin_user_trial_label', default='🏡 <b>Триал:</b>')} {hcode(trial_status)}")
         

@@ -5,8 +5,8 @@ from bot.services.yookassa_service import YooKassaService
 from bot.services.yookassa_invoice_service import YookassaInvoiceService
 
 class YookassaFactory:
+    @staticmethod
     def create(
-            self,
             shop_id: Optional[str],
             secret_key: Optional[str],
             configured_return_url: Optional[str],
