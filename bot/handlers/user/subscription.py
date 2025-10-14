@@ -262,6 +262,7 @@ async def pay_yk_callback_handler(
         "status": "pending_yookassa",
         "description": payment_description,
         "subscription_duration_months": months,
+        # TODO: передавать в callback id платежа, сменить id платежа на uui. "subscription_uuid":
     }
     db_payment_record = None
     try:

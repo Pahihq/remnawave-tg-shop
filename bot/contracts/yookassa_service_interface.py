@@ -37,7 +37,7 @@ class YookassaServiceInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_payment(self, payment_id_in_yookassa: str) -> Optional[Dict[str, Any]]:
+    async def get_payment_info(self, payment_id_in_yookassa: str) -> Optional[Dict[str, Any]]:
         """
         Get information about the payment
         """
