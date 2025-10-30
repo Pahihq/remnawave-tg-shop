@@ -172,11 +172,12 @@ python bot/main_bot.py
 bot/
 ├── handlers/
 │   ├── admin/
-│   │   ├── phone_transfer_payments.py  # 🔒 Изолированный модуль
+│   │   ├── phone_transfer_payments.py  # 🔒 Изолированный модуль (admin handlers)
 │   │   ├── payments.py                 # ⚠️ Минимальные изменения
-│   │   └── __init__.py                 # ✅ Условная регистрация
+│   │   └── __init__.py                 # ✅ Условная регистрация admin router
 │   └── user/
-│       └── phone_transfer_handler.py   # 🔒 Изолированный модуль
+│       ├── phone_transfer_handler.py   # 🔒 Изолированный модуль (user handlers)
+│       └── __init__.py                 # ✅ Условная регистрация user router
 ├── services/
 │   └── phone_transfer_service.py       # 🔒 Изолированный модуль
 ├── keyboards/
@@ -184,7 +185,7 @@ bot/
 │       ├── admin_keyboards.py          # 🔒 Функции для phone_transfer
 │       └── user_keyboards.py           # ⚠️ Одна кнопка if ENABLED
 └── dal/
-    └── phone_transfer_dal.py           # 🔒 Изолированный модуль
+    └── phone_transfer_dal.py           # 🔒 Изолированный модуль (если есть)
 
 db/
 └── models.py                            # ⚠️ Только PhoneTransferPayment
@@ -192,6 +193,21 @@ db/
 config/
 └── settings.py                          # ✅ PHONE_TRANSFER_* переменные
 ```
+
+### Ключевые изолированные модули:
+
+1. **`bot/handlers/admin/phone_transfer_payments.py`**
+   - Все admin handlers: approve, reject, view
+   - Уведомления пользователей о решениях
+   
+2. **`bot/handlers/user/phone_transfer_handler.py`**  
+   - User callback handlers: `pay_phone_transfer:`, `upload_receipt:`
+   - Photo message handler для загрузки чеков
+   - Уведомления админов о новых чеках
+
+3. **Условная регистрация в обоих `__init__.py`**
+   - Роутеры регистрируются только если `PHONE_TRANSFER_ENABLED=True`
+   - Graceful degradation при отсутствии модуля
 
 ## 📊 Риски конфликтов (по файлам)
 

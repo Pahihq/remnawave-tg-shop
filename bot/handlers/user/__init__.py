@@ -14,3 +14,14 @@ user_router_aggregate.include_router(trial_handler.router)
 user_router_aggregate.include_router(start.router)
 user_router_aggregate.include_router(subscription_router)
 user_router_aggregate.include_router(referral.router)
+
+# Conditionally include phone_transfer_handler router if feature is enabled
+try:
+    from config.settings import get_settings
+    settings = get_settings()
+    if settings.PHONE_TRANSFER_ENABLED:
+        from . import phone_transfer_handler
+        user_router_aggregate.include_router(phone_transfer_handler.router)
+except Exception:
+    # If settings fail or phone_transfer module doesn't exist, skip gracefully
+    pass
